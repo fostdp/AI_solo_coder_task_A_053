@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/alertpanel.tsx","./src/components/floorplan.tsx","./src/components/meterdetailpanel.tsx","./src/components/pricingsettings.tsx","./src/components/totalcards.tsx","./src/hooks/usewebsocket.ts","./src/store/index.ts","./src/utils/api.ts","./src/utils/format.ts","./shared/types.ts"],"version":"5.8.3"}

@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: energy-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-energy_management}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql
+      - ./migrations/002_partition_config.sql:/docker-entrypoint-initdb.d/002_partition_config.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-energy_management}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c log_min_duration_statement=1000
+      -c log_lock_waits=on
+      -c track_activity_query_size=2048
+
+  backend:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: energy-backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${API_PORT:-3001}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-energy_management}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      WEBSOCKET_PORT: ${API_PORT:-3001}
+      DATA_REPORT_INTERVAL: ${DATA_REPORT_INTERVAL:-15000}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config
+      - ./shared:/app/shared
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: energy-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: energy-simulator
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      WEBSOCKET_URL: ws://backend:${API_PORT:-3001}
+      SIMULATOR_INTERVAL: ${SIMULATOR_INTERVAL:-15000}
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-true}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config
+      - ./shared:/app/shared
+    restart: unless-stopped
+    profiles:
+      - simulator
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  default:
+    name: energy-network
+    driver: bridge

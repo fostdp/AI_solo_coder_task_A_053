@@ -1,0 +1,440 @@
+{
+  "canvas": {
+    "width": 1200,
+    "height": 700,
+    "padding": 60,
+    "gridSize": 50,
+    "background": {
+      "startColor": "#f8fafc",
+      "endColor": "#f1f5f9"
+    },
+    "gridColor": "#e2e8f0"
+  },
+  "floorPlan": {
+    "borderRadius": 16,
+    "backgroundColor": "#ffffff",
+    "borderColor": "#cbd5e1"
+  },
+  "commonElements": {
+    "stairs": {
+      "fillColor": "#e5e7eb",
+      "borderColor": "#9ca3af",
+      "count": 6
+    },
+    "elevator": {
+      "fillColor": "#dbeafe",
+      "borderColor": "#60a5fa"
+    }
+  },
+  "floors": [
+    {
+      "floor": 1,
+      "name": "1层 - 商业楼层",
+      "areas": [
+        {
+          "id": "lobby",
+          "name": "大堂",
+          "x": 120,
+          "y": 120,
+          "width": 240,
+          "height": 320,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": [8, 4]
+        },
+        {
+          "id": "retail",
+          "name": "商业区",
+          "x": 380,
+          "y": 120,
+          "width": 300,
+          "height": 320,
+          "fillColor": "rgba(249, 115, 22, 0.05)",
+          "borderColor": "#f97316",
+          "dash": []
+        },
+        {
+          "id": "dining",
+          "name": "餐饮区",
+          "x": 700,
+          "y": 120,
+          "width": 280,
+          "height": 320,
+          "fillColor": "rgba(34, 197, 94, 0.05)",
+          "borderColor": "#22c55e",
+          "dash": []
+        },
+        {
+          "id": "electrical",
+          "name": "机电房",
+          "x": 1000,
+          "y": 120,
+          "width": 120,
+          "height": 160,
+          "fillColor": "rgba(168, 162, 158, 0.1)",
+          "borderColor": "#a8a29e",
+          "dash": [4, 4]
+        },
+        {
+          "id": "parking",
+          "name": "停车场入口",
+          "x": 1000,
+          "y": 290,
+          "width": 120,
+          "height": 150,
+          "fillColor": "rgba(107, 114, 128, 0.05)",
+          "borderColor": "#6b7280",
+          "dash": []
+        }
+      ],
+      "stairs": [
+        { "x": 150, "y": 450, "width": 40, "height": 40 },
+        { "x": 200, "y": 450, "width": 40, "height": 40 },
+        { "x": 250, "y": 450, "width": 40, "height": 40 },
+        { "x": 300, "y": 450, "width": 40, "height": 40 },
+        { "x": 350, "y": 450, "width": 40, "height": 40 },
+        { "x": 400, "y": 450, "width": 40, "height": 40 }
+      ],
+      "elevators": [
+        { "x": 470, "y": 450, "radius": 20 },
+        { "x": 520, "y": 450, "radius": 20 }
+      ]
+    },
+    {
+      "floor": 2,
+      "name": "2层 - 办公区A",
+      "areas": [
+        {
+          "id": "office_a1",
+          "name": "办公A1区",
+          "x": 120,
+          "y": 120,
+          "width": 260,
+          "height": 200,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "office_a2",
+          "name": "办公A2区",
+          "x": 120,
+          "y": 330,
+          "width": 260,
+          "height": 200,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "meeting",
+          "name": "会议区",
+          "x": 400,
+          "y": 120,
+          "width": 280,
+          "height": 200,
+          "fillColor": "rgba(168, 85, 247, 0.05)",
+          "borderColor": "#a855f7",
+          "dash": []
+        },
+        {
+          "id": "office_a3",
+          "name": "办公A3区",
+          "x": 400,
+          "y": 330,
+          "width": 280,
+          "height": 200,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "office_a4",
+          "name": "办公A4区",
+          "x": 700,
+          "y": 120,
+          "width": 300,
+          "height": 410,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "electrical",
+          "name": "机电房",
+          "x": 1020,
+          "y": 120,
+          "width": 100,
+          "height": 180,
+          "fillColor": "rgba(168, 162, 158, 0.1)",
+          "borderColor": "#a8a29e",
+          "dash": [4, 4]
+        },
+        {
+          "id": "storage",
+          "name": "储藏室",
+          "x": 1020,
+          "y": 310,
+          "width": 100,
+          "height": 220,
+          "fillColor": "rgba(107, 114, 128, 0.05)",
+          "borderColor": "#6b7280",
+          "dash": [4, 4]
+        }
+      ],
+      "stairs": [
+        { "x": 150, "y": 540, "width": 40, "height": 40 },
+        { "x": 200, "y": 540, "width": 40, "height": 40 },
+        { "x": 250, "y": 540, "width": 40, "height": 40 },
+        { "x": 300, "y": 540, "width": 40, "height": 40 },
+        { "x": 350, "y": 540, "width": 40, "height": 40 },
+        { "x": 400, "y": 540, "width": 40, "height": 40 }
+      ],
+      "elevators": [
+        { "x": 470, "y": 550, "radius": 20 },
+        { "x": 520, "y": 550, "radius": 20 }
+      ]
+    },
+    {
+      "floor": 3,
+      "name": "3层 - 办公区B",
+      "areas": [
+        {
+          "id": "office_b1",
+          "name": "办公B1区",
+          "x": 120,
+          "y": 120,
+          "width": 320,
+          "height": 200,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "office_b2",
+          "name": "办公B2区",
+          "x": 120,
+          "y": 330,
+          "width": 320,
+          "height": 200,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "office_b3",
+          "name": "办公B3区",
+          "x": 460,
+          "y": 120,
+          "width": 280,
+          "height": 410,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "reception",
+          "name": "接待区",
+          "x": 760,
+          "y": 120,
+          "width": 240,
+          "height": 200,
+          "fillColor": "rgba(236, 72, 153, 0.05)",
+          "borderColor": "#ec4899",
+          "dash": []
+        },
+        {
+          "id": "office_b4",
+          "name": "办公B4区",
+          "x": 760,
+          "y": 330,
+          "width": 240,
+          "height": 200,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "electrical",
+          "name": "机电房",
+          "x": 1020,
+          "y": 120,
+          "width": 100,
+          "height": 410,
+          "fillColor": "rgba(168, 162, 158, 0.1)",
+          "borderColor": "#a8a29e",
+          "dash": [4, 4]
+        }
+      ],
+      "stairs": [
+        { "x": 150, "y": 540, "width": 40, "height": 40 },
+        { "x": 200, "y": 540, "width": 40, "height": 40 },
+        { "x": 250, "y": 540, "width": 40, "height": 40 },
+        { "x": 300, "y": 540, "width": 40, "height": 40 },
+        { "x": 350, "y": 540, "width": 40, "height": 40 },
+        { "x": 400, "y": 540, "width": 40, "height": 40 }
+      ],
+      "elevators": [
+        { "x": 470, "y": 550, "radius": 20 },
+        { "x": 520, "y": 550, "radius": 20 }
+      ]
+    },
+    {
+      "floor": 4,
+      "name": "4层 - 技术中心",
+      "areas": [
+        {
+          "id": "data_center",
+          "name": "数据中心",
+          "x": 120,
+          "y": 120,
+          "width": 360,
+          "height": 250,
+          "fillColor": "rgba(6, 182, 212, 0.05)",
+          "borderColor": "#06b6d4",
+          "dash": []
+        },
+        {
+          "id": "tech_room",
+          "name": "技术机房",
+          "x": 500,
+          "y": 120,
+          "width": 320,
+          "height": 250,
+          "fillColor": "rgba(6, 182, 212, 0.05)",
+          "borderColor": "#06b6d4",
+          "dash": []
+        },
+        {
+          "id": "ups_room",
+          "name": "UPS室",
+          "x": 840,
+          "y": 120,
+          "width": 280,
+          "height": 120,
+          "fillColor": "rgba(249, 115, 22, 0.05)",
+          "borderColor": "#f97316",
+          "dash": []
+        },
+        {
+          "id": "lab",
+          "name": "实验室",
+          "x": 120,
+          "y": 380,
+          "width": 360,
+          "height": 180,
+          "fillColor": "rgba(34, 197, 94, 0.05)",
+          "borderColor": "#22c55e",
+          "dash": []
+        },
+        {
+          "id": "tech_office",
+          "name": "技术办公区",
+          "x": 500,
+          "y": 380,
+          "width": 320,
+          "height": 180,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        },
+        {
+          "id": "electrical",
+          "name": "机电房",
+          "x": 840,
+          "y": 250,
+          "width": 280,
+          "height": 160,
+          "fillColor": "rgba(168, 162, 158, 0.1)",
+          "borderColor": "#a8a29e",
+          "dash": [4, 4]
+        },
+        {
+          "id": "storage",
+          "name": "备件库",
+          "x": 840,
+          "y": 420,
+          "width": 280,
+          "height": 140,
+          "fillColor": "rgba(107, 114, 128, 0.05)",
+          "borderColor": "#6b7280",
+          "dash": [4, 4]
+        }
+      ],
+      "stairs": [
+        { "x": 150, "y": 570, "width": 40, "height": 40 },
+        { "x": 200, "y": 570, "width": 40, "height": 40 },
+        { "x": 250, "y": 570, "width": 40, "height": 40 },
+        { "x": 300, "y": 570, "width": 40, "height": 40 },
+        { "x": 350, "y": 570, "width": 40, "height": 40 },
+        { "x": 400, "y": 570, "width": 40, "height": 40 }
+      ],
+      "elevators": [
+        { "x": 470, "y": 580, "radius": 20 },
+        { "x": 520, "y": 580, "radius": 20 }
+      ]
+    },
+    {
+      "floor": 5,
+      "name": "5层 - 管理层",
+      "areas": [
+        {
+          "id": "executive",
+          "name": "行政套房",
+          "x": 120,
+          "y": 120,
+          "width": 320,
+          "height": 220,
+          "fillColor": "rgba(180, 83, 9, 0.05)",
+          "borderColor": "#b45309",
+          "dash": []
+        },
+        {
+          "id": "board_room",
+          "name": "董事会议室",
+          "x": 460,
+          "y": 120,
+          "width": 320,
+          "height": 220,
+          "fillColor": "rgba(220, 38, 38, 0.05)",
+          "borderColor": "#dc2626",
+          "dash": []
+        },
+        {
+          "id": "vip_meeting",
+          "name": "VIP会议室",
+          "x": 800,
+          "y": 120,
+          "width": 320,
+          "height": 220,
+          "fillColor": "rgba(217, 70, 239, 0.05)",
+          "borderColor": "#d946ef",
+          "dash": []
+        },
+        {
+          "id": "admin",
+          "name": "行政办公区",
+          "x": 120,
+          "y": 350,
+          "width": 1000,
+          "height": 200,
+          "fillColor": "rgba(59, 130, 246, 0.05)",
+          "borderColor": "#3b82f6",
+          "dash": []
+        }
+      ],
+      "stairs": [
+        { "x": 150, "y": 560, "width": 40, "height": 40 },
+        { "x": 200, "y": 560, "width": 40, "height": 40 },
+        { "x": 250, "y": 560, "width": 40, "height": 40 },
+        { "x": 300, "y": 560, "width": 40, "height": 40 },
+        { "x": 350, "y": 560, "width": 40, "height": 40 },
+        { "x": 400, "y": 560, "width": 40, "height": 40 }
+      ],
+      "elevators": [
+        { "x": 470, "y": 570, "radius": 20 },
+        { "x": 520, "y": 570, "radius": 20 }
+      ]
+    }
+  ]
+}

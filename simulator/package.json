@@ -1,0 +1,22 @@
+{
+  "name": "energy-simulator",
+  "version": "1.0.0",
+  "description": "智能楼宇能源管理系统 - 计量点数据模拟器",
+  "type": "module",
+  "main": "dist/simulator.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/simulator.js",
+    "dev": "tsx simulator.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.20.3",
+    "typescript": "~5.8.3"
+  }
+}
