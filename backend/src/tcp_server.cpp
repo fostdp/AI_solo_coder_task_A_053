@@ -10,63 +10,65 @@ void TcpSession::start() {
 
 void TcpSession::do_read() {
     auto self(shared_from_this());
-    buffer_.resize(4096);
     socket_.async_read_some(
-        boost::asio::buffer(buffer_),
+        boost::asio::buffer(read_buf_),
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
-            handle_read(ec, bytes_transferred);
+            if (!ec) {
+                frame_buf_.insert(frame_buf_.end(),
+                    read_buf_.begin(), read_buf_.begin() + bytes_transferred);
+                try_parse_frames();
+                do_read();
+            } else if (ec != boost::asio::error::eof) {
+                std::cerr << "TCP session read error: " << ec.message() << std::endl;
+            }
         });
 }
 
-void TcpSession::handle_read(const boost::system::error_code& error,
-                              size_t bytes_transferred) {
-    if (!error) {
-        data_.insert(data_.end(), buffer_.begin(), buffer_.begin() + bytes_transferred);
+void TcpSession::try_parse_frames() {
+    while (frame_buf_.size() >= ProfinetParser::HEADER_SIZE) {
+        uint16_t payload_len = static_cast<uint16_t>(frame_buf_[12]) |
+                               (static_cast<uint16_t>(frame_buf_[13]) << 8);
 
-        while (data_.size() >= ProfinetParser::HEADER_SIZE + 4) {
-            try {
-                auto remote_endpoint = socket_.remote_endpoint();
-                auto local_endpoint = socket_.local_endpoint();
+        size_t frame_total = ProfinetParser::HEADER_SIZE + payload_len;
 
-                ProfinetPacket packet = parser_.parse(
-                    data_,
-                    remote_endpoint.address().to_string(),
-                    local_endpoint.address().to_string());
-
-                if (packet.frame_id == static_cast<uint16_t>(ProfinetParser::PacketType::LASER_DATA)) {
-                    LaserMicroscopeData laser_data = parser_.parse_laser_data(packet.payload);
-                    if (laser_callback_) {
-                        laser_callback_(packet, laser_data);
-                    }
-                } else if (packet.frame_id == static_cast<uint16_t>(ProfinetParser::PacketType::VIBRATION_DATA)) {
-                    VibrationData vib_data = parser_.parse_vibration_data(packet.payload);
-                    if (vibration_callback_) {
-                        vibration_callback_(packet, vib_data);
-                    }
-                }
-
-                uint32_t cycle_counter = 0;
-                if (data_.size() >= 8) {
-                    cycle_counter = parser_.read_u32(data_, 4);
-                }
-                send_acknowledge(cycle_counter);
-
-                size_t total_size = ProfinetParser::HEADER_SIZE + 4 + packet.payload.size();
-                if (data_.size() >= total_size) {
-                    data_.erase(data_.begin(), data_.begin() + total_size);
-                } else {
-                    break;
-                }
-            } catch (const std::exception& e) {
-                std::cerr << "Error parsing PROFINET packet: " << e.what() << std::endl;
-                data_.clear();
-                break;
-            }
+        if (frame_buf_.size() < frame_total) {
+            break;
         }
 
-        do_read();
-    } else if (error != boost::asio::error::eof) {
-        std::cerr << "TCP session error: " << error.message() << std::endl;
+        try {
+            std::vector<uint8_t> frame_data(frame_buf_.begin(),
+                                             frame_buf_.begin() + frame_total);
+
+            auto remote_ep = socket_.remote_endpoint();
+            auto local_ep = socket_.local_endpoint();
+
+            ProfinetPacket packet = parser_.parse(
+                frame_data,
+                remote_ep.address().to_string(),
+                local_ep.address().to_string());
+
+            if (packet.frame_id == static_cast<uint16_t>(ProfinetParser::PacketType::LASER_DATA)) {
+                LaserMicroscopeData laser_data = parser_.parse_laser_data(packet.payload);
+                if (laser_callback_) laser_callback_(packet, laser_data);
+            } else if (packet.frame_id == static_cast<uint16_t>(ProfinetParser::PacketType::VIBRATION_DATA)) {
+                VibrationData vib_data = parser_.parse_vibration_data(packet.payload);
+                if (vibration_callback_) vibration_callback_(packet, vib_data);
+            }
+
+            uint32_t cycle_counter = parser_.read_u32(frame_data, 4);
+            send_acknowledge(cycle_counter);
+
+        } catch (const std::exception& e) {
+            std::cerr << "Error parsing PROFINET frame, discarding: " << e.what() << std::endl;
+        }
+
+        frame_buf_.erase(frame_buf_.begin(), frame_buf_.begin() + frame_total);
+    }
+
+    if (frame_buf_.size() > MAX_FRAME_BUF_SIZE) {
+        std::cerr << "Frame buffer overflow (" << frame_buf_.size()
+                  << " bytes), resetting" << std::endl;
+        frame_buf_.clear();
     }
 }
 
