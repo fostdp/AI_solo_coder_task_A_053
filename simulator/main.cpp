@@ -32,7 +32,12 @@ public:
           socket_(ioc),
           config_(config),
           cycle_counter_(0),
-          running_(false) {}
+          running_(false),
+          reconnect_timer_(ioc),
+          disconnect_sim_timer_(ioc),
+          connected_(false),
+          reconnect_count_(0),
+          max_reconnect_attempts_(10) {}
 
     void start() {
         running_ = true;
@@ -46,6 +51,8 @@ public:
         if (timer_) {
             timer_->cancel();
         }
+        reconnect_timer_.cancel();
+        disconnect_sim_timer_.cancel();
     }
 
 private:
@@ -56,14 +63,62 @@ private:
         socket_.async_connect(endpoint,
             [this](boost::system::error_code ec) {
                 if (!ec) {
+                    connected_ = true;
+                    reconnect_count_ = 0;
                     std::cout << "[" << config_.name << "] 连接到服务器成功" << std::endl;
                     start_sending();
+                    schedule_random_disconnect();
                 } else {
+                    connected_ = false;
                     std::cerr << "[" << config_.name << "] 连接失败: " << ec.message() << std::endl;
                     if (running_) {
-                        std::this_thread::sleep_for(std::chrono::seconds(5));
-                        connect();
+                        schedule_reconnect();
                     }
+                }
+            });
+    }
+
+    void schedule_reconnect() {
+        if (reconnect_count_ >= max_reconnect_attempts_) {
+            std::cerr << "[" << config_.name << "] 达到最大重连次数" << std::endl;
+            return;
+        }
+
+        reconnect_count_++;
+        int delay_sec = std::min(30, 2 * reconnect_count_);
+
+        std::cout << "[" << config_.name << "] " << delay_sec
+                  << "秒后重连 (第" << reconnect_count_ << "次)" << std::endl;
+
+        reconnect_timer_.expires_after(std::chrono::seconds(delay_sec));
+        reconnect_timer_.async_wait(
+            [this](boost::system::error_code ec) {
+                if (!ec && running_) {
+                    boost::system::error_code sock_ec;
+                    socket_.close(sock_ec);
+                    connect();
+                }
+            });
+    }
+
+    void schedule_random_disconnect() {
+        std::uniform_int_distribution<int> dist(180, 1800);
+        int disconnect_after_sec = dist(rng_);
+
+        disconnect_sim_timer_.expires_after(std::chrono::seconds(disconnect_after_sec));
+        disconnect_sim_timer_.async_wait(
+            [this](boost::system::error_code ec) {
+                if (!ec && running_ && connected_) {
+                    std::cout << "[" << config_.name << "] *** 模拟断线 ***" << std::endl;
+                    connected_ = false;
+                    boost::system::error_code sock_ec;
+                    socket_.close(sock_ec);
+
+                    if (timer_) {
+                        timer_->cancel();
+                    }
+
+                    schedule_reconnect();
                 }
             });
     }
@@ -104,6 +159,10 @@ private:
             [this](boost::system::error_code ec, std::size_t) {
                 if (ec) {
                     std::cerr << "[" << config_.name << "] 发送失败: " << ec.message() << std::endl;
+                    connected_ = false;
+                    if (running_) {
+                        schedule_reconnect();
+                    }
                 }
             });
 
@@ -297,7 +356,13 @@ private:
     SensorConfig config_;
     uint32_t cycle_counter_;
     std::atomic<bool> running_;
+    std::atomic<bool> connected_;
+    int reconnect_count_;
+    int max_reconnect_attempts_;
     std::unique_ptr<boost::asio::steady_timer> timer_;
+    boost::asio::steady_timer reconnect_timer_;
+    boost::asio::steady_timer disconnect_sim_timer_;
+    std::mt19937 rng_{std::random_device{}()};
 };
 
 }
