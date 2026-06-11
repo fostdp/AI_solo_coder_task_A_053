@@ -93,6 +93,15 @@ public:
     void generate_particles(int count);
     void generate_boundary();
 
+    void reset() {
+        particles_.clear();
+        particles_.shrink_to_fit();
+        contacts_.clear();
+        contacts_.shrink_to_fit();
+        geometry_.boundary_points.clear();
+        geometry_.boundary_points.shrink_to_fit();
+    }
+
     int particle_count() const { return particles_.size(); }
     const std::vector<DEMParticle>& particles() const { return particles_; }
     const std::vector<DEMContact>& contacts() const { return contacts_; }
@@ -107,6 +116,7 @@ public:
     double calculate_porosity() const;
 
 private:
+    static constexpr size_t MAX_CONTACTS = 50000;
     DEMParameters params_;
     DEMGeometry geometry_;
     std::vector<DEMParticle> particles_;
