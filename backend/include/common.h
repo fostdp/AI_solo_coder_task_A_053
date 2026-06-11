@@ -210,4 +210,53 @@ inline void from_json(const json& j, Point3D& p) {
     j.at("width").get_to(p.width);
 }
 
+enum class PipelineMsgType {
+    RAW_PROFINET,
+    PARSED_LASER,
+    PARSED_VIBRATION,
+    CRACK_DETECTION,
+    FATIGUE_PREDICTION,
+    DEM_SIMULATION,
+    ALERT_NOTIFY,
+    WS_BROADCAST
+};
+
+struct ParsedLaserMessage {
+    ProfinetPacket packet;
+    LaserMicroscopeData data;
+};
+
+struct ParsedVibrationMessage {
+    ProfinetPacket packet;
+    VibrationData data;
+};
+
+struct CrackDetectionMessage {
+    LaserMicroscopeData laser_data;
+    int porcelain_id;
+    std::vector<CrackInfo> cracks;
+    std::vector<std::vector<Point3D>> crack_points;
+};
+
+struct FatiguePredictionMessage {
+    CrackInfo crack;
+    int porcelain_id;
+    CrackPrediction prediction;
+};
+
+struct DemSimulationMessage {
+    CrackInfo crack;
+    int porcelain_id;
+    RepairMaterial material;
+    RepairSimulation result;
+};
+
+struct AlertNotifyMessage {
+    Alert alert;
+};
+
+struct WsBroadcastMessage {
+    json payload;
+};
+
 }
