@@ -63,6 +63,13 @@ public:
     int64_t insert_simulation(const RepairSimulation& simulation);
     void insert_profinet_packet(const ProfinetPacket& packet);
 
+    bool batch_insert_laser_data(const std::vector<LaserMicroscopeData>& data_list);
+    bool batch_insert_vibration_data(const std::vector<VibrationData>& data_list);
+    bool batch_insert_crack_detections(const LaserMicroscopeData& laser_data,
+                                        const std::vector<CrackInfo>& cracks,
+                                        const std::vector<std::vector<Point3D>>& crack_points,
+                                        int porcelain_id);
+
     std::vector<PorcelainInfo> get_all_porcelains();
     PorcelainInfo get_porcelain(int id);
     std::vector<CrackInfo> get_cracks_by_porcelain(int porcelain_id, int limit = 100);
