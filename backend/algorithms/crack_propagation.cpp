@@ -8,7 +8,102 @@ namespace algorithms {
 
 double CrackPropagationModel::calculate_stress_intensity(double crack_length,
                                                          double stress) const {
-    return params_.geometric_factor_Y * stress * sqrt(M_PI * crack_length);
+    double effective_stress = stress;
+    if (params_.enable_residual_stress_correction) {
+        double residual_parallel = params_.residual_stress_parallel
+            * params_.residual_stress_calibration_factor;
+        double residual_perp = params_.residual_stress_perpendicular
+            * params_.residual_stress_calibration_factor;
+        double k_sigma = 1.0 + (residual_parallel + residual_perp) /
+            (2.0 * std::abs(stress) + 1.0);
+        effective_stress = stress * k_sigma + 0.3 * residual_parallel;
+    }
+    return params_.geometric_factor_Y * effective_stress * sqrt(M_PI * crack_length);
+}
+
+double CrackPropagationModel::calculate_effective_stress(
+    double applied_stress, double crack_angle_rad) const {
+    if (!params_.enable_residual_stress_correction) {
+        return applied_stress;
+    }
+    double cos2 = cos(crack_angle_rad) * cos(crack_angle_rad);
+    double sin2 = sin(crack_angle_rad) * sin(crack_angle_rad);
+    double sigma_xx = params_.residual_stress_parallel
+        * params_.residual_stress_calibration_factor;
+    double sigma_yy = params_.residual_stress_perpendicular
+        * params_.residual_stress_calibration_factor;
+    double residual_on_crack = sigma_xx * cos2 + sigma_yy * sin2;
+    double alpha = 0.4;
+    return applied_stress + alpha * residual_on_crack;
+}
+
+double CrackPropagationModel::calculate_residual_stress_at_point(
+    double x, double y, double z) const {
+    if (params_.xrd_calibration_data.empty()) {
+        return params_.residual_stress_parallel
+            * params_.residual_stress_calibration_factor;
+    }
+    return interpolate_xrd_data(x, y, z, true);
+}
+
+double CrackPropagationModel::interpolate_xrd_data(
+    double x, double y, double z, bool parallel_component) const {
+    if (params_.xrd_calibration_data.empty()) return 0.0;
+
+    double total_weight = 0.0;
+    double weighted_sum = 0.0;
+
+    for (const auto& dp : params_.xrd_calibration_data) {
+        if (!dp.is_valid) continue;
+        double dx = x - dp.measurement_position_x;
+        double dy = y - dp.measurement_position_y;
+        double dz = z - dp.measurement_position_z;
+        double dist = sqrt(dx * dx + dy * dy + dz * dz);
+        double h = 2.0;
+        double weight = exp(-dist * dist / (2.0 * h * h));
+        double value = parallel_component ? dp.sigma_parallel : dp.sigma_perpendicular;
+        weighted_sum += weight * value;
+        total_weight += weight;
+    }
+
+    if (total_weight < 1e-10) {
+        return parallel_component
+            ? params_.residual_stress_parallel * params_.residual_stress_calibration_factor
+            : params_.residual_stress_perpendicular * params_.residual_stress_calibration_factor;
+    }
+
+    return weighted_sum / total_weight * params_.residual_stress_calibration_factor;
+}
+
+void CrackPropagationModel::calibrate_with_xrd(
+    const std::vector<XRDResidualStressData>& xrd_data) {
+    if (xrd_data.empty()) return;
+
+    params_.xrd_calibration_data = xrd_data;
+
+    double sum_parallel = 0.0;
+    double sum_perp = 0.0;
+    size_t valid_count = 0;
+
+    for (const auto& dp : xrd_data) {
+        if (!dp.is_valid) continue;
+        sum_parallel += dp.sigma_parallel;
+        sum_perp += dp.sigma_perpendicular;
+        valid_count++;
+    }
+
+    if (valid_count > 0) {
+        double avg_parallel = sum_parallel / valid_count;
+        double avg_perp = sum_perp / valid_count;
+        if (std::abs(params_.residual_stress_parallel) > 1e-6) {
+            params_.residual_stress_calibration_factor =
+                avg_parallel / params_.residual_stress_parallel;
+            params_.residual_stress_calibration_factor =
+                std::max(0.5, std::min(2.0, params_.residual_stress_calibration_factor));
+        }
+        params_.residual_stress_parallel = avg_parallel;
+        params_.residual_stress_perpendicular = avg_perp;
+    }
 }
 
 double CrackPropagationModel::calculate_crack_growth_rate(double delta_K) const {
@@ -22,9 +117,10 @@ double CrackPropagationModel::critical_crack_length() const {
 }
 
 double CrackPropagationModel::runge_kutta_step(double a, double t, double dt) const {
-    double delta_stress = params_.maximum_stress - params_.minimum_stress;
-    double K_max = calculate_stress_intensity(a, params_.maximum_stress);
-    double K_min = calculate_stress_intensity(a, params_.minimum_stress);
+    double sigma_max_eff = calculate_effective_stress(params_.maximum_stress, 0.0);
+    double sigma_min_eff = calculate_effective_stress(params_.minimum_stress, 0.0);
+    double K_max = calculate_stress_intensity(a, sigma_max_eff);
+    double K_min = calculate_stress_intensity(a, sigma_min_eff);
     double delta_K = K_max - K_min;
 
     double da_dN = calculate_crack_growth_rate(delta_K);
@@ -79,8 +175,10 @@ ParisLawResult CrackPropagationModel::predict(const CrackInfo& crack,
         result.crack_depth.push_back(depth);
         result.crack_width.push_back(width);
 
-        double K_max = calculate_stress_intensity(a, params_.maximum_stress);
-        double K_min = calculate_stress_intensity(a, params_.minimum_stress);
+        double sigma_max_eff = calculate_effective_stress(params_.maximum_stress, 0.0);
+        double sigma_min_eff = calculate_effective_stress(params_.minimum_stress, 0.0);
+        double K_max = calculate_stress_intensity(a, sigma_max_eff);
+        double K_min = calculate_stress_intensity(a, sigma_min_eff);
         double delta_K = K_max - K_min;
         result.stress_intensity_range.push_back(delta_K);
 
@@ -194,7 +292,12 @@ nlohmann::json CrackPropagationModel::result_to_json(const ParisLawResult& resul
         {"stress_ratio", result.parameters.stress_ratio_R},
         {"initial_crack_length", result.parameters.initial_crack_length},
         {"maximum_stress", result.parameters.maximum_stress},
-        {"fracture_toughness", result.parameters.fracture_toughness}
+        {"fracture_toughness", result.parameters.fracture_toughness},
+        {"residual_stress_parallel", result.parameters.residual_stress_parallel},
+        {"residual_stress_perpendicular", result.parameters.residual_stress_perpendicular},
+        {"residual_stress_calibration_factor", result.parameters.residual_stress_calibration_factor},
+        {"enable_residual_stress_correction", result.parameters.enable_residual_stress_correction},
+        {"xrd_calibration_points", result.parameters.xrd_calibration_data.size()}
     };
     return j;
 }
