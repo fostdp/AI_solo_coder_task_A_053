@@ -2,6 +2,7 @@
 
 #include <string>
 #include <cstdint>
+#include <cstdlib>
 
 namespace porcelain_monitor {
 namespace config {
@@ -13,6 +14,26 @@ struct DatabaseConfig {
     std::string user = "postgres";
     std::string password = "postgres";
     int pool_size = 10;
+    int max_pool_size = 50;
+    int connection_timeout_ms = 5000;
+
+    void apply_env() {
+        const char* env = std::getenv("PM_DB_HOST");
+        if (env) host = env;
+        env = std::getenv("PM_DB_PORT");
+        if (env) port = static_cast<uint16_t>(std::atoi(env));
+        env = std::getenv("PM_DB_NAME");
+        if (env) name = env;
+        env = std::getenv("PM_DB_USER");
+        if (env) user = env;
+        env = std::getenv("PM_DB_PASSWORD");
+        if (env) password = env;
+        env = std::getenv("PM_DB_POOL_SIZE");
+        if (env) {
+            pool_size = std::atoi(env);
+            pool_size = std::max(1, std::min(pool_size, max_pool_size));
+        }
+    }
 };
 
 struct ServerConfig {
@@ -21,6 +42,17 @@ struct ServerConfig {
     uint16_t websocket_port = 8081;
     std::string bind_address = "0.0.0.0";
     int thread_pool_size = 8;
+
+    void apply_env() {
+        const char* env = std::getenv("PM_PROFINET_PORT");
+        if (env) profinet_port = static_cast<uint16_t>(std::atoi(env));
+        env = std::getenv("PM_HTTP_PORT");
+        if (env) http_port = static_cast<uint16_t>(std::atoi(env));
+        env = std::getenv("PM_WS_PORT");
+        if (env) websocket_port = static_cast<uint16_t>(std::atoi(env));
+        env = std::getenv("PM_THREAD_POOL");
+        if (env) thread_pool_size = std::max(1, std::atoi(env));
+    }
 };
 
 struct AlertConfig {
@@ -30,6 +62,15 @@ struct AlertConfig {
     bool websocket_enabled = true;
     std::string sms_gateway_url = "http://sms-gateway.example.com/send";
     std::string alert_phone_number = "+8613800138000";
+
+    void apply_env() {
+        const char* env = std::getenv("PM_DEPTH_THRESHOLD");
+        if (env) depth_threshold = std::atof(env);
+        env = std::getenv("PM_WIDTH_THRESHOLD");
+        if (env) width_threshold = std::atof(env);
+        env = std::getenv("PM_SMS_ENABLED");
+        if (env) sms_enabled = (std::string(env) == "1" || std::string(env) == "true");
+    }
 };
 
 struct AlgorithmConfig {
@@ -56,6 +97,12 @@ struct Config {
     ServerConfig server;
     AlertConfig alerts;
     AlgorithmConfig algorithms;
+
+    void apply_env() {
+        database.apply_env();
+        server.apply_env();
+        alerts.apply_env();
+    }
 };
 
 inline Config& get_config() {
