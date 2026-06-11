@@ -1,6 +1,0 @@
-{
-  "watch": ["src", "../shared"],
-  "ext": "ts,json",
-  "ignore": ["dist"],
-  "exec": "node --loader ts-node/esm src/app.ts"
-}
