@@ -7,8 +7,10 @@
 -- CREATE DATABASE porcelain_monitor;
 -- \c porcelain_monitor;
 
--- 启用PostGIS扩展（如果需要空间查询）
--- CREATE EXTENSION IF NOT EXISTS postgis;
+-- 启用PostGIS扩展
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS postgis_topology;
+CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
 
 -- =============================================
 -- 枚举类型定义
@@ -110,7 +112,7 @@ CREATE TABLE crack_points (
     id BIGSERIAL PRIMARY KEY,
     crack_id INTEGER REFERENCES cracks(id) NOT NULL,
     measurement_id BIGINT,
-    point_3d NUMERIC[3] NOT NULL,
+    point_3d geometry(PointZ, 4326) NOT NULL,
     normal_vector NUMERIC[3],
     depth NUMERIC(10,3) NOT NULL,
     width NUMERIC(10,3) NOT NULL,
@@ -267,10 +269,10 @@ CREATE INDEX idx_sensors_status ON sensors(status);
 CREATE INDEX idx_cracks_porcelain_id ON cracks(porcelain_id);
 CREATE INDEX idx_cracks_status ON cracks(status);
 
--- 裂纹点表索引（GiST索引用于空间查询）
+-- 裂纹点表索引（GiST空间索引用于PostGIS几何查询）
 CREATE INDEX idx_crack_points_crack_id ON crack_points(crack_id);
 CREATE INDEX idx_crack_points_timestamp ON crack_points(timestamp);
--- CREATE INDEX idx_crack_points_3d ON crack_points USING GIST(point_3d gist_numrange_ops);
+CREATE INDEX idx_crack_points_3d ON crack_points USING GIST(point_3d);
 
 -- 激光显微镜数据表索引
 CREATE INDEX idx_laser_data_sensor_id ON laser_microscope_data(sensor_id);
@@ -488,5 +490,64 @@ BEGIN
     FROM jsonb_array_elements(p_points) AS pt;
 
     RETURN v_crack_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================
+-- 函数：PostGIS空间查询 - 查找指定范围内的裂纹点
+-- =============================================
+
+CREATE OR REPLACE FUNCTION find_crack_points_within_radius(
+    p_center_x DOUBLE PRECISION,
+    p_center_y DOUBLE PRECISION,
+    p_center_z DOUBLE PRECISION,
+    p_radius DOUBLE PRECISION
+) RETURNS TABLE (
+    crack_id INTEGER,
+    point_id BIGINT,
+    depth NUMERIC,
+    width NUMERIC,
+    distance DOUBLE PRECISION
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        cp.crack_id,
+        cp.id,
+        cp.depth,
+        cp.width,
+        ST_3DDistance(
+            cp.point_3d,
+            ST_MakePoint(p_center_x, p_center_y, p_center_z)::geometry(PointZ, 4326)
+        ) AS distance
+    FROM crack_points cp
+    WHERE ST_3DDWithin(
+        cp.point_3d,
+        ST_MakePoint(p_center_x, p_center_y, p_center_z)::geometry(PointZ, 4326),
+        p_radius
+    )
+    ORDER BY distance;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================
+-- 函数：获取裂纹空间范围边界框
+-- =============================================
+
+CREATE OR REPLACE FUNCTION get_crack_bbox(p_crack_id INTEGER)
+RETURNS TABLE (
+    min_x DOUBLE PRECISION, min_y DOUBLE PRECISION, min_z DOUBLE PRECISION,
+    max_x DOUBLE PRECISION, max_y DOUBLE PRECISION, max_z DOUBLE PRECISION
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        ST_XMin(bbox) AS min_x, ST_YMin(bbox) AS min_y, ST_ZMin(bbox) AS min_z,
+        ST_XMax(bbox) AS max_x, ST_YMax(bbox) AS max_y, ST_ZMax(bbox) AS max_z
+    FROM (
+        SELECT ST_3DExtent(cp.point_3d) AS bbox
+        FROM crack_points cp
+        WHERE cp.crack_id = p_crack_id
+    ) sub;
 END;
 $$ LANGUAGE plpgsql;
