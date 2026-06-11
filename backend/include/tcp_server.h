@@ -3,6 +3,7 @@
 #include <boost/asio.hpp>
 #include <memory>
 #include <vector>
+#include <array>
 #include <functional>
 #include <mutex>
 #include "common.h"
@@ -29,12 +30,13 @@ public:
 
 private:
     void do_read();
-    void handle_read(const boost::system::error_code& error, size_t bytes_transferred);
+    void try_parse_frames();
     void send_acknowledge(uint32_t cycle_counter);
 
     tcp::socket socket_;
-    std::vector<uint8_t> buffer_;
-    std::vector<uint8_t> data_;
+    std::array<uint8_t, 8192> read_buf_{};
+    std::vector<uint8_t> frame_buf_;
+    static constexpr size_t MAX_FRAME_BUF_SIZE = 4 * 1024 * 1024;
     ProfinetParser parser_;
     DataCallback laser_callback_;
     VibrationCallback vibration_callback_;
