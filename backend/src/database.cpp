@@ -665,4 +665,269 @@ bool DatabaseManager::update_alert_status(int64_t alert_id, AlertStatus status) 
     return success;
 }
 
+bool DatabaseManager::batch_insert_laser_data(const std::vector<LaserMicroscopeData>& data_list) {
+    if (data_list.empty()) return true;
+
+    auto conn = pool_->acquire();
+    if (!conn->begin_transaction()) {
+        pool_->release(conn);
+        return false;
+    }
+
+    bool ok = true;
+    for (const auto& data : data_list) {
+        auto ts = std::chrono::system_clock::to_time_t(data.measurement_time);
+        std::tm tm_buf;
+#ifdef _WIN32
+        gmtime_s(&tm_buf, &ts);
+#else
+        gmtime_r(&tm_buf, &ts);
+#endif
+        std::ostringstream time_ss;
+        time_ss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
+
+        std::ostringstream scan_area_ss;
+        scan_area_ss << "ARRAY[" << data.scan_area[0] << "," << data.scan_area[1]
+                     << "," << data.scan_area[2] << "," << data.scan_area[3] << "]::numeric[]";
+
+        std::string processed_data_str = data.processed_data.empty() ?
+            "NULL" : ("'" + data.processed_data.dump() + "'::jsonb");
+
+        std::ostringstream query;
+        query << "INSERT INTO laser_microscope_data "
+              << "(sensor_id, porcelain_id, measurement_time, scan_area, resolution, "
+              << "crack_detected, crack_count, processed_data) VALUES ("
+              << data.sensor_id << ", "
+              << data.porcelain_id << ", '"
+              << time_ss.str() << "', "
+              << scan_area_ss.str() << ", "
+              << data.resolution << ", "
+              << (data.crack_detected ? "TRUE" : "FALSE") << ", "
+              << data.crack_count << ", "
+              << processed_data_str << ")";
+
+        PGresult* res = PQexec(conn->get(), query.str().c_str());
+        if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
+            std::cerr << "Batch insert laser data error: " << PQerrorMessage(conn->get()) << std::endl;
+            ok = false;
+            PQclear(res);
+            break;
+        }
+        PQclear(res);
+    }
+
+    if (ok) {
+        conn->commit_transaction();
+    } else {
+        conn->rollback_transaction();
+    }
+    pool_->release(conn);
+    return ok;
+}
+
+bool DatabaseManager::batch_insert_vibration_data(const std::vector<VibrationData>& data_list) {
+    if (data_list.empty()) return true;
+
+    auto conn = pool_->acquire();
+    if (!conn->begin_transaction()) {
+        pool_->release(conn);
+        return false;
+    }
+
+    bool ok = true;
+    for (const auto& data : data_list) {
+        auto ts = std::chrono::system_clock::to_time_t(data.measurement_time);
+        std::tm tm_buf;
+#ifdef _WIN32
+        gmtime_s(&tm_buf, &ts);
+#else
+        gmtime_r(&tm_buf, &ts);
+#endif
+        std::ostringstream time_ss;
+        time_ss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
+
+        std::ostringstream amp_ss;
+        amp_ss << "ARRAY[";
+        for (size_t i = 0; i < data.amplitude.size(); ++i) {
+            if (i > 0) amp_ss << ",";
+            amp_ss << data.amplitude[i];
+        }
+        amp_ss << "]::numeric[]";
+
+        std::string freq_spec_str = data.frequency_spectrum.empty() ?
+            "NULL" : ("'" + data.frequency_spectrum.dump() + "'::jsonb");
+
+        std::ostringstream query;
+        query << "INSERT INTO vibration_data "
+              << "(sensor_id, porcelain_id, measurement_time, frequency_spectrum, amplitude, "
+              << "rms_value, peak_value, dominant_frequency, temperature, humidity) VALUES ("
+              << data.sensor_id << ", "
+              << data.porcelain_id << ", '"
+              << time_ss.str() << "', "
+              << freq_spec_str << ", "
+              << amp_ss.str() << ", "
+              << data.rms_value << ", "
+              << data.peak_value << ", "
+              << data.dominant_frequency << ", "
+              << data.temperature << ", "
+              << data.humidity << ")";
+
+        PGresult* res = PQexec(conn->get(), query.str().c_str());
+        if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
+            std::cerr << "Batch insert vibration data error: " << PQerrorMessage(conn->get()) << std::endl;
+            ok = false;
+            PQclear(res);
+            break;
+        }
+        PQclear(res);
+    }
+
+    if (ok) {
+        conn->commit_transaction();
+    } else {
+        conn->rollback_transaction();
+    }
+    pool_->release(conn);
+    return ok;
+}
+
+bool DatabaseManager::batch_insert_crack_detections(
+    const LaserMicroscopeData& laser_data,
+    const std::vector<CrackInfo>& cracks,
+    const std::vector<std::vector<Point3D>>& crack_points,
+    int porcelain_id) {
+
+    auto conn = pool_->acquire();
+    if (!conn->begin_transaction()) {
+        pool_->release(conn);
+        return false;
+    }
+
+    int64_t laser_id = -1;
+    {
+        auto ts = std::chrono::system_clock::to_time_t(laser_data.measurement_time);
+        std::tm tm_buf;
+#ifdef _WIN32
+        gmtime_s(&tm_buf, &ts);
+#else
+        gmtime_r(&tm_buf, &ts);
+#endif
+        std::ostringstream time_ss;
+        time_ss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
+
+        std::ostringstream scan_area_ss;
+        scan_area_ss << "ARRAY[" << laser_data.scan_area[0] << "," << laser_data.scan_area[1]
+                     << "," << laser_data.scan_area[2] << "," << laser_data.scan_area[3] << "]::numeric[]";
+
+        std::string processed_data_str = laser_data.processed_data.empty() ?
+            "NULL" : ("'" + laser_data.processed_data.dump() + "'::jsonb");
+
+        std::ostringstream query;
+        query << "INSERT INTO laser_microscope_data "
+              << "(sensor_id, porcelain_id, measurement_time, scan_area, resolution, "
+              << "crack_detected, crack_count, processed_data) VALUES ("
+              << laser_data.sensor_id << ", "
+              << laser_data.porcelain_id << ", '"
+              << time_ss.str() << "', "
+              << scan_area_ss.str() << ", "
+              << laser_data.resolution << ", "
+              << (laser_data.crack_detected ? "TRUE" : "FALSE") << ", "
+              << laser_data.crack_count << ", "
+              << processed_data_str << ") RETURNING id";
+
+        PGresult* res = PQexec(conn->get(), query.str().c_str());
+        if (res && PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+            laser_id = std::atoll(PQgetvalue(res, 0, 0));
+        } else {
+            std::cerr << "Batch: laser insert failed: " << PQerrorMessage(conn->get()) << std::endl;
+            PQclear(res);
+            conn->rollback_transaction();
+            pool_->release(conn);
+            return false;
+        }
+        PQclear(res);
+    }
+
+    for (size_t ci = 0; ci < cracks.size() && ci < crack_points.size(); ++ci) {
+        const auto& crack = cracks[ci];
+        int64_t crack_id = -1;
+
+        {
+            auto ts = std::chrono::system_clock::to_time_t(crack.detected_at);
+            std::tm tm_buf;
+#ifdef _WIN32
+            gmtime_s(&tm_buf, &ts);
+#else
+            gmtime_r(&tm_buf, &ts);
+#endif
+            std::ostringstream time_ss;
+            time_ss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
+
+            std::ostringstream query;
+            query << "INSERT INTO cracks "
+                  << "(porcelain_id, crack_code, detected_date, max_depth, max_width, total_length) VALUES ("
+                  << porcelain_id << ", '"
+                  << crack.crack_code << "', '"
+                  << time_ss.str() << "', "
+                  << crack.max_depth << ", "
+                  << crack.max_width << ", "
+                  << crack.total_length << ") RETURNING id";
+
+            PGresult* res = PQexec(conn->get(), query.str().c_str());
+            if (res && PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+                crack_id = std::atoll(PQgetvalue(res, 0, 0));
+            } else {
+                std::cerr << "Batch: crack insert failed: " << PQerrorMessage(conn->get()) << std::endl;
+                PQclear(res);
+                conn->rollback_transaction();
+                pool_->release(conn);
+                return false;
+            }
+            PQclear(res);
+        }
+
+        for (const auto& point : crack_points[ci]) {
+            std::ostringstream point_ss, normal_ss;
+            point_ss << "ARRAY[" << point.x << "," << point.y << "," << point.z << "]::numeric[]";
+            if (point.normal) {
+                normal_ss << "ARRAY[" << (*point.normal)[0] << "," << (*point.normal)[1]
+                          << "," << (*point.normal)[2] << "]::numeric[]";
+            } else {
+                normal_ss << "NULL";
+            }
+
+            std::ostringstream query;
+            query << "INSERT INTO crack_points "
+                  << "(crack_id, point_3d, normal_vector, depth, width, curvature) VALUES ("
+                  << crack_id << ", "
+                  << point_ss.str() << ", "
+                  << normal_ss.str() << ", "
+                  << point.depth << ", "
+                  << point.width << ", "
+                  << (point.curvature ? std::to_string(*point.curvature) : "NULL")
+                  << ")";
+
+            PGresult* res = PQexec(conn->get(), query.str().c_str());
+            if (!res || PQresultStatus(res) != PGRES_COMMAND_OK) {
+                std::cerr << "Batch: crack point insert failed" << std::endl;
+                PQclear(res);
+                conn->rollback_transaction();
+                pool_->release(conn);
+                return false;
+            }
+            PQclear(res);
+        }
+    }
+
+    if (!conn->commit_transaction()) {
+        std::cerr << "Batch: commit failed" << std::endl;
+        conn->rollback_transaction();
+        pool_->release(conn);
+        return false;
+    }
+
+    pool_->release(conn);
+    return true;
+}
+
 }
