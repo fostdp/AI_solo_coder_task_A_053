@@ -20,6 +20,8 @@ find_package(Boost 1.70 REQUIRED COMPONENTS
 
 find_package(PostgreSQL REQUIRED)
 
+find_package(spdlog REQUIRED)
+
 include_directories(
     ${Boost_INCLUDE_DIRS}
     ${PostgreSQL_INCLUDE_DIRS}
@@ -44,6 +46,7 @@ add_executable(porcelain_monitor ${BACKEND_SOURCES})
 target_link_libraries(porcelain_monitor
     ${Boost_LIBRARIES}
     ${PostgreSQL_LIBRARIES}
+    spdlog::spdlog
 )
 
 if(WIN32)
