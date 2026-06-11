@@ -5,7 +5,8 @@ class PorcelainViewer {
         this.camera = null;
         this.renderer = null;
         this.porcelainMesh = null;
-        this.crackMeshes = [];
+        this.mergedCrackLines = new MergedCrackLines();
+        this.mergedCrackTubes = new MergedCrackTubes();
         this.controls = null;
         this.animationId = null;
         this.autoRotate = false;
@@ -282,20 +283,28 @@ class PorcelainViewer {
     loadCracks(cracksData) {
         this.clearCracks();
 
-        cracksData.forEach(crack => {
-            const points = crack.points || crack.crack_points || [];
-            const maxDepth = crack.max_depth || 100;
-
-            if (points.length >= 2) {
-                const crackMesh = this.createCrackLine(points, maxDepth);
-                if (crackMesh) {
-                    crackMesh.userData.crackId = crack.id;
-                    crackMesh.userData.crackData = crack;
-                    this.crackMeshes.push(crackMesh);
-                    this.scene.add(crackMesh);
-                }
-            }
+        const cracksWithPoints = cracksData.filter(c => {
+            const pts = c.points || c.crack_points || [];
+            return pts.length >= 2;
         });
+
+        cracksWithPoints.forEach(crack => {
+            this.mergedCrackLines.addCrack(crack);
+        });
+
+        this.mergedCrackLines.build(this.scene);
+
+        if (cracksWithPoints.length <= 100) {
+            this.mergedCrackTubes.buildFromCracks(cracksWithPoints, this.scene);
+        }
+
+        this.mergedCrackLines.setVisible(this.showCracks);
+        this.mergedCrackTubes.setVisible(this.showCracks);
+
+        console.log(`[CrackRender] 已加载 ${cracksWithPoints.length} 条裂纹, ` +
+                    `顶点=${this.mergedCrackLines.totalVertices}, ` +
+                    `线段=${this.mergedCrackLines.totalSegments}, ` +
+                    `DrawCall=${this.mergedCrackLines.drawCalls + (this.mergedCrackTubes.mergedMesh ? 1 : 0)}`);
     }
 
     clearScene() {
@@ -310,14 +319,16 @@ class PorcelainViewer {
     }
 
     clearCracks() {
-        this.crackMeshes.forEach(mesh => {
-            this.scene.remove(mesh);
-            mesh.traverse(child => {
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) child.material.dispose();
-            });
-        });
-        this.crackMeshes = [];
+        this.mergedCrackLines.clearFromScene(this.scene);
+        this.mergedCrackLines.clear();
+        this.mergedCrackTubes.clearFromScene(this.scene);
+        this.mergedCrackTubes.clear();
+    }
+
+    setShowCracks(show) {
+        this.showCracks = show;
+        this.mergedCrackLines.setVisible(show);
+        this.mergedCrackTubes.setVisible(show);
     }
 
     setDisplayMode(mode) {
@@ -342,13 +353,6 @@ class PorcelainViewer {
                 material.opacity = 0.5;
                 break;
         }
-    }
-
-    setShowCracks(show) {
-        this.showCracks = show;
-        this.crackMeshes.forEach(mesh => {
-            mesh.visible = show;
-        });
     }
 
     setAutoRotate(rotate) {
@@ -388,6 +392,13 @@ class PorcelainViewer {
         }
 
         this.clearScene();
+
+        if (this.mergedCrackLines) {
+            this.mergedCrackLines.dispose();
+        }
+        if (this.mergedCrackTubes) {
+            this.mergedCrackTubes.dispose();
+        }
 
         if (this.renderer) {
             this.renderer.dispose();
