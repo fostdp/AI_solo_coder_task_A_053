@@ -226,11 +226,14 @@ void DEMSimulation::compute_contact_forces(DEMParticle& a, DEMParticle& b) {
 
 void DEMSimulation::detect_collisions() {
     contacts_.clear();
+    contacts_.reserve(particles_.size() * 2);
 
     for (size_t i = 0; i < particles_.size(); ++i) {
         for (size_t j = i + 1; j < particles_.size(); ++j) {
+            if (contacts_.size() >= MAX_CONTACTS) break;
             compute_contact_forces(particles_[i], particles_[j]);
         }
+        if (contacts_.size() >= MAX_CONTACTS) break;
     }
 }
 
@@ -386,12 +389,15 @@ DEMResult DEMSimulation::run(int max_steps, bool) {
         std::count_if(particles_.begin(), particles_.end(),
                       [](const DEMParticle& p) { return p.is_boundary; }));
 
+    result.energy_history.reserve(max_steps / 10 + 1);
+    result.force_history.reserve(max_steps / 10 + 1);
+
     double total_energy = 0;
     double max_force = 0;
     double sum_force = 0;
 
     for (int step = 0; step < max_steps; ++step) {
-        step();
+        this->step();
 
         double ke = 0, pe = 0;
         double step_max_force = 0;
@@ -411,8 +417,10 @@ DEMResult DEMSimulation::run(int max_steps, bool) {
         max_force = std::max(max_force, step_max_force);
         sum_force += step_sum_force;
 
-        result.energy_history.push_back(total_energy);
-        result.force_history.push_back(step_max_force);
+        if (step % 10 == 0) {
+            result.energy_history.push_back(total_energy);
+            result.force_history.push_back(step_max_force);
+        }
 
         if (step % 100 == 0 && step > 0) {
             double avg_vel = 0;
@@ -426,12 +434,21 @@ DEMResult DEMSimulation::run(int max_steps, bool) {
             if (count > 0) avg_vel /= count;
             if (avg_vel < 1e-12) break;
         }
+
+        if (step % 500 == 0 && step > 0) {
+            contacts_.shrink_to_fit();
+        }
     }
 
     result.total_steps = max_steps;
     result.simulation_time = max_steps * params_.time_step;
-    result.particles = particles_;
-    result.contacts = contacts_;
+
+    for (const auto& p : particles_) {
+        if (!p.is_boundary) {
+            result.particles.push_back(p);
+        }
+    }
+
     result.contact_count = static_cast<int>(contacts_.size());
     result.filling_rate = calculate_filling_rate();
     result.average_packing_density = calculate_packing_density();
@@ -441,6 +458,8 @@ DEMResult DEMSimulation::run(int max_steps, bool) {
     result.porosity = calculate_porosity();
     result.max_force = max_force;
     result.avg_force = max_steps > 0 ? sum_force / max_steps : 0;
+
+    contacts_.shrink_to_fit();
 
     return result;
 }
